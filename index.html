@@ -84,6 +84,10 @@ dialog .go{background:var(--me);color:#fff;border-radius:10px;padding:8px 16px}
   <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen 0.5B (light, fast)</option>
   <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">Qwen 1.5B (smarter)</option>
   <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama 1B</option>
+  <optgroup label="CPU mode (works on any phone, slower)">
+   <option value="cpu:Qwen/Qwen2.5-0.5B-Instruct-GGUF|qwen2.5-0.5b-instruct-q4_k_m.gguf">Qwen 0.5B CPU (~490 MB)</option>
+   <option value="cpu:Qwen/Qwen2.5-1.5B-Instruct-GGUF|qwen2.5-1.5b-instruct-q4_k_m.gguf">Qwen 1.5B CPU (~1.1 GB, slower)</option>
+  </optgroup>
  </select>
  <p style="font-size:13px;opacity:.7;margin:0 0 10px">Downloads once, then works offline. Bigger models need more RAM.</p>
  <button class="go" id="loadBtn">Load model</button> <button id="closeDlg">Close</button>
@@ -148,13 +152,23 @@ $("spk").onclick=()=>{tts=!tts;$("spk").classList.toggle("on",tts);kv.set("tts",
 // model
 $("title").onclick=()=>$("dlg").showModal();$("closeDlg").onclick=()=>$("dlg").close();
 $("loadBtn").onclick=()=>{$("dlg").close();load()};
+let cpu=null,gpuOK=false;
 async function load(){
- if(!navigator.gpu){status("⚠️ WebGPU not available. Use the latest Chrome on Android.");return}
  if(loading)return;loading=true;const id=$("model").value;
  if(engine){try{await engine.unload()}catch(e){}engine=null}
- status("Preparing model…");
+ cpu=null;status("Preparing model…");
  try{
-  engine=await webllm.CreateMLCEngine(id,{initProgressCallback:p=>status(p.text,p.progress)});
+  if(id.startsWith("cpu:")){
+   const [repo,file]=id.slice(4).split("|");
+   const B="https://cdn.jsdelivr.net/npm/@wllama/wllama@3/esm/";
+   const {Wllama}=await import(B+"index.js");const W=(await import(B+"wasm-from-cdn.js")).default;
+   const w=new Wllama(W,{allowOffline:true});
+   await w.loadModelFromHF({repo,file},{n_ctx:2048,n_gpu_layers:0,jinja:true,progressCallback:({loaded,total})=>status("Downloading model… "+Math.round(loaded/total*100)+"%",loaded/total)});
+   cpu=w;
+  }else{
+   if(!gpuOK){status("⚠️ This phone has no full WebGPU. Tap the app name and pick a CPU model.");loading=false;return}
+   engine=await webllm.CreateMLCEngine(id,{initProgressCallback:p=>status(p.text,p.progress)});
+  }
   await kv.set("model",id);status("✅ Model ready");setTimeout(()=>status(""),2500);
  }catch(e){status("❌ "+e.message)}
  loading=false;
@@ -168,15 +182,22 @@ $("plus").onclick=()=>$("file").click();
 $("file").onchange=async e=>{const f=e.target.files[0];if(!f)return;const t=await f.text();$("inp").value=("[File: "+f.name+"]\n"+t.slice(0,3000)+(t.length>3000?"\n…(trimmed)":"")+"\n\n");tog();e.target.value=""};
 async function send(){
  const t=$("inp").value.trim();if(!t||busy)return;busy=true;
- if(!engine){await load();if(!engine){busy=false;return}}
+ if(!engine&&!cpu){await load();if(!engine&&!cpu){busy=false;return}}
  $("inp").value="";tog();
  const first=!cur.msgs.length;cur.msgs.push({role:"user",content:t});
  if(first){cur.title=t.slice(0,40);if(!chats.includes(cur))chats.unshift(cur);render()}else add("user",t);
  const out=add("assistant","…");let full="";
  const sys=(cur.topic==="custom"?custom:T[cur.topic].p)+(name?" The user's name is "+name+".":"");
  try{
-  const s=await engine.chat.completions.create({stream:true,messages:[{role:"system",content:sys},...cur.msgs.slice(-12)]});
-  for await(const c of s){full+=c.choices[0]?.delta?.content||"";out.textContent=full;out.scrollIntoView({block:"end"})}
+  const ms=[{role:"system",content:sys},...cur.msgs.slice(-12)];
+  if(cpu){
+   out.textContent="Thinking… (CPU mode is slower, please wait)";
+   const r=await cpu.createChatCompletion({messages:ms,max_tokens:400,temperature:0.7});
+   full=r.choices[0].message.content;out.textContent=full;
+  }else{
+   const s=await engine.chat.completions.create({stream:true,messages:ms});
+   for await(const c of s){full+=c.choices[0]?.delta?.content||"";out.textContent=full;out.scrollIntoView({block:"end"})}
+  }
   cur.msgs.push({role:"assistant",content:full});
   if(tts&&full)speechSynthesis.speak(new SpeechSynthesisUtterance(full));
  }catch(e){out.textContent="❌ "+e.message}
@@ -187,6 +208,8 @@ $("send").onclick=send;
 // start: splash for 2 seconds, then the main screen
 (async()=>{
  try{name=(await kv.get("name"))||"";custom=(await kv.get("custom"))||"";chats=(await kv.get("chats"))||[];tts=!!(await kv.get("tts"));const m=await kv.get("model");if(m)$("model").value=m}catch(e){}
+ try{gpuOK=!!(await navigator.gpu?.requestAdapter())}catch(e){}
+ if(!gpuOK)$("model").value=document.querySelector('option[value^="cpu:"]').value;
  $("spk").classList.toggle("on",tts);newChat();
  if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
  await new Promise(r=>setTimeout(r,2000));
