@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pocket Tutor</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<meta name="theme-color" content="#ffffff">
+<style>
+:root{--bg:#fff;--fg:#1c1c28;--card:#f3f3f8;--me:#2b3cff;--mefg:#fff;--bd:#dcdce6;--dim:#8a8a9a}
+@media(prefers-color-scheme:dark){:root{--bg:#101018;--fg:#ececf4;--card:#1d1d28;--bd:#33334a;--me:#4d5bff}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-serif;overflow:hidden}
+button,textarea,select{font:inherit;color:var(--fg)}
+button{background:none;border:0;cursor:pointer;padding:0}
+svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#splash{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;transition:opacity .4s}
+#splash img{width:96px;height:96px}#splash h2{margin:0;font-weight:600}
+#app{height:100dvh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
+#top{display:flex;align-items:center;gap:14px;padding:12px 16px}
+#title{flex:1;text-align:center;font-size:22px;font-weight:500}
+#spk .on,#spk.on .off{display:none}#spk.on .on{display:inline}
+#empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:0 24px}
+#empty img{width:72px;height:72px}#empty p{margin:0;font-size:20px}
+#log{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:8px}
+.m{max-width:88%;padding:8px 12px;border-radius:16px;white-space:pre-wrap;word-break:break-word;background:var(--card)}
+.m.user{align-self:flex-end;background:var(--me);color:var(--mefg)}
+#chips{display:flex;gap:10px;overflow-x:auto;padding:8px 14px}
+#chips button{flex:none;border:1px solid var(--bd);border-radius:20px;padding:8px 16px;white-space:nowrap}
+#stw{padding:4px 18px;font-size:13px;color:var(--dim)}#bar0{height:3px;background:var(--card);margin-top:3px}#fill{height:100%;width:0;background:var(--me)}
+#box{display:flex;align-items:flex-end;gap:10px;margin:6px 14px 0;padding:8px 14px;border:1px solid var(--bd);border-radius:28px}
+#inp{flex:1;border:0;outline:0;background:none;resize:none;max-height:120px;padding:6px 0}
+#box button{padding:4px 0}
+#send{background:var(--me);color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center}
+#send svg{width:20px;height:20px}
+.note{text-align:center;font-size:12px;color:var(--dim);padding:6px}
+#scrim{position:fixed;inset:0;background:#0006;z-index:20}
+#drawer{position:fixed;top:0;bottom:0;left:0;width:82%;max-width:330px;background:var(--bg);z-index:21;transform:translateX(-100%);transition:transform .25s;display:flex;flex-direction:column;padding:16px;gap:8px}
+#drawer.open{transform:none}
+#list{flex:1;overflow-y:auto}
+.row{display:flex;align-items:center;gap:8px;padding:10px 4px;border-bottom:1px solid var(--bd)}
+.row span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.row button{color:var(--dim)}
+#wipe{border:1px solid var(--bd);border-radius:10px;padding:10px}
+dialog{border:1px solid var(--bd);border-radius:16px;background:var(--bg);color:var(--fg);max-width:90%}
+dialog select{width:100%;padding:8px;background:var(--card);border:1px solid var(--bd);border-radius:10px;margin:8px 0}
+dialog .go{background:var(--me);color:#fff;border-radius:10px;padding:8px 16px}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#222;color:#fff;padding:8px 14px;border-radius:14px;font-size:14px;z-index:60;max-width:85%;text-align:center}
+</style>
+</head>
+<body>
+<div id="splash"><img src="icon.svg" alt=""><h2 class="appname"></h2></div>
+
+<div id="app">
+<div id="top">
+ <button id="menu" aria-label="Chats"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h16"/></svg></button>
+ <button id="title"><span class="appname"></span> ⌄</button>
+ <button id="spk" aria-label="Read aloud"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="off" d="M17 9l5 6M22 9l-5 6"/><path class="on" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+ <button id="new" aria-label="New chat"><svg viewBox="0 0 24 24"><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6M17 3v6M14 6h6"/></svg></button>
+</div>
+<div id="empty"><img src="icon.svg" alt=""><p id="hello"></p></div>
+<main id="log" hidden></main>
+<div id="chips"></div>
+<div id="stw" hidden><span id="st"></span><div id="bar0"><div id="fill"></div></div></div>
+<div id="box">
+ <textarea id="inp" rows="1" dir="auto"></textarea>
+ <button id="cam" aria-label="Camera"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13" r="3"/></svg></button>
+ <button id="plus" aria-label="Attach text file"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></button>
+ <button id="send" hidden aria-label="Send"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+</div>
+<div class="note">Generated by AI. Please verify.</div>
+<input type="file" id="file" accept=".txt,.md,.csv" hidden>
+</div>
+
+<div id="scrim" hidden></div>
+<aside id="drawer"><b>Chat history</b><div id="list"></div><button id="wipe">🗑️ Delete all my data</button></aside>
+
+<dialog id="dlg">
+ <b>AI model</b>
+ <select id="model">
+  <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen 0.5B (light, fast)</option>
+  <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">Qwen 1.5B (smarter)</option>
+  <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama 1B</option>
+ </select>
+ <p style="font-size:13px;opacity:.7;margin:0 0 10px">Downloads once, then works offline. Bigger models need more RAM.</p>
+ <button class="go" id="loadBtn">Load model</button> <button id="closeDlg">Close</button>
+</dialog>
+
+<script type="module">
+import * as webllm from "https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.79/+esm";
+const APP_NAME="Pocket Tutor"; // change your app name here (also edit <title> above)
+const $=id=>document.getElementById(id);
+const T={
+ study:{i:"📚",n:"Study help",h:"Study help: ask me any doubt",p:"You are a patient tutor for school and college students in all subjects including maths and science. Explain step by step in simple language with a short example, then ask one quick check question. Reply in the language the student writes in. For maths and science show the steps, and remind the student to verify important results from the textbook."},
+ eng:{i:"🗣️",n:"Learn English",h:"English coach: let's talk!",p:"You are a friendly English speaking coach. Gently correct mistakes, show the corrected sentence, explain briefly, then continue the conversation in simple English."},
+ biz:{i:"💼",n:"Business & career",h:"Business & career: what's your plan?",p:"You are a practical business and career advisor. Give clear, realistic, low-cost ideas, be honest about risks, and keep answers short. Reply in the language the user writes in."},
+ post:{i:"✍️",n:"Posts & tweets",h:"Posts & tweets: what should I write?",p:"You help write short social media posts, tweets and captions. Give three short options each time. Reply in the language the user writes in."},
+ chat:{i:"💬",n:"General chat",h:"How can I help you?",p:"You are a friendly assistant. Answer clearly and briefly in the same language the user writes in."},
+ custom:{i:"⚙️",n:"Custom",h:"Custom mode: ask away",p:""}
+};
+// All data lives in this browser's IndexedDB, on the user's own phone.
+const dbp=new Promise((ok,no)=>{const r=indexedDB.open("aichat",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});
+const kv={
+ async get(k){const d=await dbp;return new Promise(r=>{const q=d.transaction("kv").objectStore("kv").get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r()})},
+ async set(k,v){const d=await dbp;return new Promise(r=>{const t=d.transaction("kv","readwrite");t.objectStore("kv").put(v,k);t.oncomplete=()=>r();t.onerror=()=>r()})},
+ async clear(){const d=await dbp;return new Promise(r=>{const t=d.transaction("kv","readwrite");t.objectStore("kv").clear();t.oncomplete=()=>r();t.onerror=()=>r()})}
+};
+let name="",custom="",chats=[],cur=null,engine=null,busy=false,loading=false,tts=false;
+const save=()=>kv.set("chats",chats);
+function toast(t){const d=document.createElement("div");d.id="toast";d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2600)}
+function status(t,p){$("stw").hidden=!t;$("st").textContent=t||"";$("fill").style.width=p?Math.round(p*100)+"%":"0"}
+function add(role,text){const d=document.createElement("div");d.className="m "+role;d.dir="auto";d.textContent=text;$("log").appendChild(d);d.scrollIntoView({block:"end"});return d}
+function render(){
+ const empty=!cur.msgs.length;
+ $("empty").hidden=!empty;$("chips").hidden=!empty;$("log").hidden=empty;$("log").textContent="";
+ $("hello").textContent=cur.topic==="chat"?(name?"Hi "+name+"! ":"")+"How can I help you?":T[cur.topic].h;
+ cur.msgs.forEach(m=>add(m.role,m.content));
+}
+function newChat(k="chat"){speechSynthesis.cancel();cur={id:Date.now(),topic:k,title:"",msgs:[]};render();$("inp").focus()}
+function pickTopic(k){
+ if(k==="custom"){const v=prompt("Tell the AI how it should talk (example: You are my physics teacher):",custom);if(!v)return;custom=v.trim();kv.set("custom",custom)}
+ newChat(k);
+}
+for(const k of Object.keys(T)){const b=document.createElement("button");b.textContent=T[k].i+" "+T[k].n;b.onclick=()=>pickTopic(k);$("chips").appendChild(b)}
+document.querySelectorAll(".appname").forEach(e=>e.textContent=APP_NAME);
+$("inp").placeholder="Ask "+APP_NAME;
+
+// drawer (chat history)
+function drawer(open){$("drawer").classList.toggle("open",open);$("scrim").hidden=!open}
+function list(){
+ $("list").textContent="";
+ if(!chats.length){$("list").textContent="No chats yet.";return}
+ chats.forEach(c=>{
+  const r=document.createElement("div");r.className="row";
+  const s=document.createElement("span");s.textContent=c.title||"New chat";s.onclick=()=>{cur=c;render();drawer(false)};
+  const x=document.createElement("button");x.textContent="✕";x.onclick=()=>{chats=chats.filter(z=>z!==c);save();if(cur===c)newChat();list()};
+  r.append(s,x);$("list").appendChild(r);
+ });
+}
+$("menu").onclick=()=>{list();drawer(true)};$("scrim").onclick=()=>drawer(false);
+$("new").onclick=()=>newChat();
+$("wipe").onclick=async()=>{if(confirm("Delete all data (your name and all chats)?")){await kv.clear();location.reload()}};
+$("spk").onclick=()=>{tts=!tts;$("spk").classList.toggle("on",tts);kv.set("tts",tts);if(!tts)speechSynthesis.cancel()};
+
+// model
+$("title").onclick=()=>$("dlg").showModal();$("closeDlg").onclick=()=>$("dlg").close();
+$("loadBtn").onclick=()=>{$("dlg").close();load()};
+async function load(){
+ if(!navigator.gpu){status("⚠️ WebGPU not available. Use the latest Chrome on Android.");return}
+ if(loading)return;loading=true;const id=$("model").value;
+ if(engine){try{await engine.unload()}catch(e){}engine=null}
+ status("Preparing model…");
+ try{
+  engine=await webllm.CreateMLCEngine(id,{initProgressCallback:p=>status(p.text,p.progress)});
+  await kv.set("model",id);status("✅ Model ready");setTimeout(()=>status(""),2500);
+ }catch(e){status("❌ "+e.message)}
+ loading=false;
+}
+
+// input
+const tog=()=>{const has=!!$("inp").value.trim();$("send").hidden=!has;$("cam").hidden=$("plus").hidden=has;$("inp").style.height="auto";$("inp").style.height=Math.min($("inp").scrollHeight,120)+"px"};
+$("inp").oninput=tog;
+$("cam").onclick=()=>toast("Photo questions are coming soon (needs a vision model).");
+$("plus").onclick=()=>$("file").click();
+$("file").onchange=async e=>{const f=e.target.files[0];if(!f)return;const t=await f.text();$("inp").value=("[File: "+f.name+"]\n"+t.slice(0,3000)+(t.length>3000?"\n…(trimmed)":"")+"\n\n");tog();e.target.value=""};
+async function send(){
+ const t=$("inp").value.trim();if(!t||busy)return;busy=true;
+ if(!engine){await load();if(!engine){busy=false;return}}
+ $("inp").value="";tog();
+ const first=!cur.msgs.length;cur.msgs.push({role:"user",content:t});
+ if(first){cur.title=t.slice(0,40);if(!chats.includes(cur))chats.unshift(cur);render()}else add("user",t);
+ const out=add("assistant","…");let full="";
+ const sys=(cur.topic==="custom"?custom:T[cur.topic].p)+(name?" The user's name is "+name+".":"");
+ try{
+  const s=await engine.chat.completions.create({stream:true,messages:[{role:"system",content:sys},...cur.msgs.slice(-12)]});
+  for await(const c of s){full+=c.choices[0]?.delta?.content||"";out.textContent=full;out.scrollIntoView({block:"end"})}
+  cur.msgs.push({role:"assistant",content:full});
+  if(tts&&full)speechSynthesis.speak(new SpeechSynthesisUtterance(full));
+ }catch(e){out.textContent="❌ "+e.message}
+ await save();busy=false;
+}
+$("send").onclick=send;
+
+// start: splash for 2 seconds, then the main screen
+(async()=>{
+ try{name=(await kv.get("name"))||"";custom=(await kv.get("custom"))||"";chats=(await kv.get("chats"))||[];tts=!!(await kv.get("tts"));const m=await kv.get("model");if(m)$("model").value=m}catch(e){}
+ $("spk").classList.toggle("on",tts);newChat();
+ if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+ await new Promise(r=>setTimeout(r,2000));
+ $("splash").style.opacity=0;setTimeout(()=>$("splash").remove(),400);
+ if(!name){const n=prompt("Welcome! What is your name?");if(n&&n.trim()){name=n.trim();kv.set("name",name);render()}}
+})();
+</script>
+</body>
+</html>
